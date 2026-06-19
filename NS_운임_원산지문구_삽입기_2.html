@@ -58,9 +58,9 @@
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-const REMARK_TEXT = "\u203BOTHER CHARGE / \uC6D0\uC0B0\uC9C0 \uC99D\uBA85\uC11C \uBC1C\uAE09\uBE44\uC6A9 1\uC11C\uC2DD\uB2F9  USD 30";
+const REMARK_TEXT = "※OTHER CHARGE / 원산지 증명서 발급비용 1서식당  USD 30";
 const SCALE = 3;                         // 출력 해상도 (고정)
-const FONT  = "'Batang','\uBC14\uD0D5','Times New Roman',serif"; // 인보이스와 동일 계열(명조)
+const FONT  = "'Batang','바탕','Times New Roman',serif"; // 인보이스와 동일 계열(명조)
 
 const $=id=>document.getElementById(id);
 const drop=$('drop'),fileInput=$('file');
@@ -143,8 +143,9 @@ async function run(){
         }
         if(rx===null){rx=40*SCALE;ry=vp.height*0.74}
         ctx.fillStyle='#000';ctx.textBaseline='alphabetic';
-        ctx.font=`${fpt*SCALE}px ${FONT}`;
-        ctx.fillText(REMARK_TEXT, rx, ry + fpt*SCALE*2.3); // REMARK 줄 아래
+        const fpt2=fpt+3;  // 본문보다 3pt 크게
+        ctx.font=`${fpt2*SCALE}px ${FONT}`;
+        ctx.fillText(REMARK_TEXT, rx, ry + fpt2*SCALE*2.0); // REMARK 줄 아래
       }
 
       const img=cv.toDataURL('image/jpeg',0.92);
