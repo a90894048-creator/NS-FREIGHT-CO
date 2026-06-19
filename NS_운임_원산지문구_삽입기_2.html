@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>운임내역서 원산지 문구 삽입</title>
+<style>
+  body{margin:0;font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:#f4f6f3;color:#23302a}
+  .wrap{max-width:680px;margin:0 auto;padding:34px 18px 60px}
+  h1{font-size:19px;margin:0 0 6px}
+  p.sub{margin:0 0 22px;color:#6b7a72;font-size:13px}
+  .drop{border:2px dashed #bcd0c2;border-radius:14px;padding:40px 16px;text-align:center;background:#fbfdfb;cursor:pointer;transition:.15s}
+  .drop.drag{border-color:#3f7d5a;background:#eef6f0}
+  .drop .big{font-size:15px;font-weight:600;margin-bottom:4px}
+  .drop .small{font-size:12px;color:#6b7a72}
+  .files{margin-top:10px;font-size:12.5px;color:#6b7a72;line-height:1.7}
+  .btn{appearance:none;border:none;cursor:pointer;font-family:inherit;background:#3f7d5a;color:#fff;font-size:15px;font-weight:600;padding:13px 22px;border-radius:10px;margin-top:18px}
+  .btn:hover{background:#2f6147}
+  .btn[disabled]{opacity:.45;cursor:not-allowed}
+  #status{font-size:12.5px;color:#6b7a72;margin-left:12px}
+  .dl{display:flex;flex-direction:column;gap:8px;margin-top:20px}
+  .dl a{display:flex;justify-content:space-between;text-decoration:none;background:#f3f8f4;border:1px solid #e2e8e2;border-radius:10px;padding:12px 15px;color:#2f6147;font-size:13.5px;font-weight:600}
+  .dl a:hover{background:#e9f2eb}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:16px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid #e2e8e2}
+  th{color:#6b7a72;font-weight:600;font-size:11.5px}
+  td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .tag{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+  .hit{background:#e6f1ea;color:#2f6147}.miss{background:#f0f2f0;color:#9aa6a0}
+  .hide{display:none}
+  input[type=file]{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>운임내역서 원산지 문구 삽입</h1>
+  <p class="sub">OTHER CHARGE(USD)가 30의 배수인 페이지의 REMARK 칸에<br>
+  「※OTHER CHARGE / 원산지 증명서 발급비용 1서식당  USD 30」 문구를 자동으로 넣습니다.</p>
+
+  <div class="drop" id="drop">
+    <div class="big">PDF를 끌어다 놓거나 클릭</div>
+    <div class="small">여러 개 선택 가능 · 파일은 브라우저 안에서만 처리됩니다</div>
+    <input type="file" id="file" accept="application/pdf" multiple>
+  </div>
+  <div class="files" id="fileList">선택된 파일 없음</div>
+
+  <button class="btn" id="run" disabled>문구 넣고 PDF 만들기</button>
+  <span id="status"></span>
+
+  <div class="dl hide" id="downloads"></div>
+  <div id="logWrap" class="hide">
+    <table><thead><tr><th>파일</th><th>페이지</th><th>OTHER CHARGE(USD)</th><th>문구</th></tr></thead><tbody id="log"></tbody></table>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const REMARK_TEXT = "\u203BOTHER CHARGE / \uC6D0\uC0B0\uC9C0 \uC99D\uBA85\uC11C \uBC1C\uAE09\uBE44\uC6A9 1\uC11C\uC2DD\uB2F9  USD 30";
+const SCALE = 3;                         // 출력 해상도 (고정)
+const FONT  = "'Batang','\uBC14\uD0D5','Times New Roman',serif"; // 인보이스와 동일 계열(명조)
+
+const $=id=>document.getElementById(id);
+const drop=$('drop'),fileInput=$('file');
+let files=[];
+
+drop.onclick=()=>fileInput.click();
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};
+drop.ondragleave=()=>drop.classList.remove('drag');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');add([...e.dataTransfer.files])};
+fileInput.onchange=e=>add([...e.target.files]);
+
+function add(list){
+  files=files.concat(list.filter(f=>f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf')));
+  render();
+}
+function render(){
+  if(!files.length){$('fileList').textContent='선택된 파일 없음';$('run').disabled=true;return;}
+  $('fileList').innerHTML=files.map((f,i)=>`• ${f.name} <span style="color:#b4632a;cursor:pointer" data-i="${i}">[제거]</span>`).join('<br>');
+  $('fileList').querySelectorAll('[data-i]').forEach(s=>s.onclick=()=>{files.splice(+s.dataset.i,1);render()});
+  $('run').disabled=false;
+}
+
+// 같은 줄끼리 묶기
+function groupLines(items){
+  const b={};
+  for(const it of items){
+    if(!it.str||!it.str.trim())continue;
+    const y=Math.round(it.transform[5]);
+    let k=null;for(const kk in b){if(Math.abs(kk-y)<=3){k=kk;break}}
+    if(k===null){k=y;b[k]=[]}
+    b[k].push(it);
+  }
+  return Object.values(b).map(a=>{a.sort((x,y)=>x.transform[4]-y.transform[4]);return a.map(x=>x.str).join(' ')});
+}
+function nums(t){return (t.match(/\d[\d,]*\.?\d*/g)||[]).map(s=>parseFloat(s.replace(/,/g,''))).filter(n=>!isNaN(n))}
+function detect(lines){
+  for(const l of lines) if(l.includes('OTHER CHARGE'))
+    for(const n of nums(l)) if(n>0&&n%30===0) return n;
+  return null;
+}
+// 본문 글자 크기(중앙값) 측정 → 인보이스와 동일하게
+function bodyFontPt(items){
+  const sizes=items.filter(it=>it.str&&it.str.trim())
+    .map(it=>Math.hypot(it.transform[2],it.transform[3])).filter(v=>v>2&&v<40).sort((a,b)=>a-b);
+  return sizes.length?sizes[Math.floor(sizes.length/2)]:9;
+}
+
+$('run').onclick=run;
+async function run(){
+  $('run').disabled=true;$('downloads').innerHTML='';$('log').innerHTML='';
+  $('downloads').classList.add('hide');$('logWrap').classList.add('hide');
+  const {jsPDF}=window.jspdf;
+  let out=null;
+
+  for(const f of files){
+    const buf=await f.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;
+
+    for(let p=1;p<=pdf.numPages;p++){
+      $('status').textContent=`${f.name} · ${p}/${pdf.numPages}…`;
+      const page=await pdf.getPage(p);
+      const vp1=page.getViewport({scale:1}), vp=page.getViewport({scale:SCALE});
+      const cv=document.createElement('canvas');
+      cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
+      const ctx=cv.getContext('2d');
+      await page.render({canvasContext:ctx,viewport:vp}).promise;
+
+      const tc=await page.getTextContent();
+      const lines=groupLines(tc.items);
+      const amount=detect(lines);
+
+      if(amount!==null){
+        const fpt=bodyFontPt(tc.items);
+        // REMARK 헤더 위치
+        let rx=null,ry=null;
+        for(const it of tc.items){
+          if(it.str&&it.str.replace(/\s/g,'').toUpperCase()==='REMARK'){
+            const d=pdfjsLib.Util.transform(vp.transform,it.transform);rx=d[4];ry=d[5];break;
+          }
+        }
+        if(rx===null){rx=40*SCALE;ry=vp.height*0.74}
+        ctx.fillStyle='#000';ctx.textBaseline='alphabetic';
+        ctx.font=`${fpt*SCALE}px ${FONT}`;
+        ctx.fillText(REMARK_TEXT, rx, ry + fpt*SCALE*2.3); // REMARK 줄 아래
+      }
+
+      const img=cv.toDataURL('image/jpeg',0.92);
+      const w=vp1.width,h=vp1.height,o=w>h?'l':'p';
+      if(!out) out=new jsPDF({unit:'pt',format:[w,h],orientation:o});
+      else out.addPage([w,h],o);
+      out.addImage(img,'JPEG',0,0,w,h);
+
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${f.name}</td><td class="n">${p}</td><td class="n">${amount!==null?amount.toLocaleString():'-'}</td>`+
+        `<td>${amount!==null?'<span class="tag hit">삽입</span>':'<span class="tag miss">대상 아님</span>'}</td>`;
+      $('log').appendChild(tr);
+    }
+  }
+
+  const outName='0619_운임_원산지문구_합본.pdf';
+  const blob=out.output('blob');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=outName;
+  a.innerHTML=`<span>⬇ ${outName}</span><span>다운로드</span>`;
+  $('downloads').appendChild(a);
+  $('status').textContent='완료';
+  $('downloads').classList.remove('hide');$('logWrap').classList.remove('hide');
+  $('run').disabled=false;
+}
+</script>
+</body>
+</html>
