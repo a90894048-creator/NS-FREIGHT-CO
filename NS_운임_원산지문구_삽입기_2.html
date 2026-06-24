@@ -59,8 +59,8 @@
 pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
 const REMARK_TEXT = "※OTHER CHARGE / 원산지 증명서 발급비용 1서식당  USD 30";
-const SCALE = 3;                         // 출력 해상도 (고정)
-const FONT  = "'Batang','바탕','Times New Roman',serif"; // 인보이스와 동일 계열(명조)
+const SCALE = 3;
+const FONT  = "'Batang','바탕','Times New Roman',serif";
 
 const $=id=>document.getElementById(id);
 const drop=$('drop'),fileInput=$('file');
@@ -83,7 +83,6 @@ function render(){
   $('run').disabled=false;
 }
 
-// 같은 줄끼리 묶기
 function groupLines(items){
   const b={};
   for(const it of items){
@@ -95,25 +94,26 @@ function groupLines(items){
   }
   return Object.values(b).map(a=>{a.sort((x,y)=>x.transform[4]-y.transform[4]);return a.map(x=>x.str).join(' ')});
 }
+
 function detect(lines){
-  // 원산지 증명서 발급비 = "1서식(B/L)당 USD 30" → OTHER CHARGE + USD + B/L 줄만 인정
   for(const raw of lines){
-    const flat = raw.replace(/\s+/g,'');              // 키워드 판정(공백 제거)
+    const flat = raw.replace(/\s+/g,'');
     if(!flat.includes('OTHERCHARGE')) continue;
-    if(!flat.includes('USD')) continue;               // USD 청구건만
-    if(!flat.includes('B/L')) continue;               // 서식(B/L) 기준만 (R.TON 3.00 제외)
-    const idx = raw.search(/B\s*\/\s*L/);             // B/L 뒤 첫 숫자 = USD 단가/금액
+    if(!flat.includes('USD')) continue;
+    if(!flat.includes('B/L')) continue;
+    const idx = raw.search(/B\s*\/\s*L/);
     const after = idx>=0 ? raw.slice(idx) : raw;
-    const nums = [...after.matchAll(/\d[\d,]*\.?\d*/g)];  // 모든 숫자 추출
+
+    // ★ 수정: 첫 번째 숫자만 보던 것을 모든 숫자를 순회하도록 변경
+    const nums = [...after.matchAll(/\d[\d,]*\.?\d*/g)];
     for(const m of nums){
       const v = parseFloat(m[0].replace(/,/g,''));
       if(v>=30 && v%30===0) return v;
-}
     }
   }
   return null;
 }
-// 본문 글자 크기(중앙값) 측정 → 인보이스와 동일하게
+
 function bodyFontPt(items){
   const sizes=items.filter(it=>it.str&&it.str.trim())
     .map(it=>Math.hypot(it.transform[2],it.transform[3])).filter(v=>v>2&&v<40).sort((a,b)=>a-b);
@@ -146,7 +146,6 @@ async function run(){
 
       if(amount!==null){
         const fpt=bodyFontPt(tc.items);
-        // REMARK 헤더 위치
         let rx=null,ry=null;
         for(const it of tc.items){
           if(it.str&&it.str.replace(/\s/g,'').toUpperCase()==='REMARK'){
@@ -155,9 +154,9 @@ async function run(){
         }
         if(rx===null){rx=40*SCALE;ry=vp.height*0.74}
         ctx.fillStyle='#000';ctx.textBaseline='alphabetic';
-        const fpt2=fpt+3;  // 본문보다 3pt 크게
+        const fpt2=fpt+3;
         ctx.font=`${fpt2*SCALE}px ${FONT}`;
-        ctx.fillText(REMARK_TEXT, rx, ry + fpt2*SCALE*2.0); // REMARK 줄 아래
+        ctx.fillText(REMARK_TEXT, rx, ry + fpt2*SCALE*2.0);
       }
 
       const img=cv.toDataURL('image/jpeg',0.92);
