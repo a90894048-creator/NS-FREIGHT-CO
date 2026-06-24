@@ -34,7 +34,7 @@
 <body>
 <div class="wrap">
   <h1>운임내역서 원산지 문구 삽입</h1>
-  <p class="sub">OTHER CHARGE(USD)가 30의 배수인 페이지의 REMARK 칸에<br>
+  <p class="sub">OTHER CHARGE(USD)가 30, 60, 90인 경우 페이지의 REMARK 칸에<br>
   「※OTHER CHARGE / 원산지 증명서 발급비용 1서식당  USD 30」 문구를 자동으로 넣습니다.</p>
 
   <div class="drop" id="drop">
@@ -104,11 +104,11 @@ function detect(lines){
     const idx = raw.search(/B\s*\/\s*L/);
     const after = idx>=0 ? raw.slice(idx) : raw;
 
-    // ★ 수정: 첫 번째 숫자만 보던 것을 모든 숫자를 순회하도록 변경
+    // 30, 60, 90인 경우에만 문구 삽입
     const nums = [...after.matchAll(/\d[\d,]*\.?\d*/g)];
     for(const m of nums){
       const v = parseFloat(m[0].replace(/,/g,''));
-      if(v>=30 && v%30===0) return v;
+      if(v===30 || v===60 || v===90) return v;
     }
   }
   return null;
