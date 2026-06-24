@@ -104,10 +104,11 @@ function detect(lines){
     if(!flat.includes('B/L')) continue;               // 서식(B/L) 기준만 (R.TON 3.00 제외)
     const idx = raw.search(/B\s*\/\s*L/);             // B/L 뒤 첫 숫자 = USD 단가/금액
     const after = idx>=0 ? raw.slice(idx) : raw;
-    const m = after.match(/\d[\d,]*\.?\d*/);          // 환율·원화금액은 보지 않음
-    if(m){
+    const nums = [...after.matchAll(/\d[\d,]*\.?\d*/g)];  // 모든 숫자 추출
+    for(const m of nums){
       const v = parseFloat(m[0].replace(/,/g,''));
-      if(v>0 && v%30===0) return v;
+      if(v>=30 && v%30===0) return v;
+}
     }
   }
   return null;
